@@ -6,10 +6,26 @@
 #include "fs_level1.c"
 #include "fs_level2.c"
 
+SUPER *sp = NULL;
+GD    *gp = NULL;
+INODE *ip = NULL;
+DIR   *dp = NULL;
+
+MINODE minode[NMINODE] = {0};
+PROC   proc[NPROC] = {0}, *running = NULL;
+MINODE *root = NULL;
+
+int dev = 0, imap = 0, bmap = 0;
+int ninodes = 0, nblocks = 0;
+int blk = 0, offset = 0;
+int inodes_begin_block = 0, inodes_per_block = 0;
+char buf[BLKSIZE] = { 0 };
+char buf2[BLKSIZE] = { 0 };
+
 int main(int argc, char *argv[], char *env[])
 {
 	int err = 0, i = 0;
-	char* input;
+	char input[256];
 	char* splitInput[256];
 
 	err = mount_root();
@@ -34,25 +50,35 @@ int main(int argc, char *argv[], char *env[])
 			i++;
 		}
 
+		i = 2;
+
+		splitInput[0] = strtok(input, " ");
+
+		splitInput[1] = strtok(NULL, " ");
+
 		while (splitInput[i] = strtok(NULL, " "))
-		i = 0;
-	
-		while (splitInput[i] = strtok(NULL, " ")
 		{
 			i++;
 		}
 
 		if (!strcmp(splitInput[0], "ls"))
 		{
-			ls(splitInput[1]);
+			if (splitInput[1])
+			{
+				ls(splitInput[1]);
+			}
+			else
+			{
+				ls("\n");
+			}
 		}
-		else if (splitinput[1] && !strcmp(splitInput[0], "cd"))
+		else if (splitInput[1] && !strcmp(splitInput[0], "cd"))
 		{
 			cd(splitInput[1]);
 		}
 		else if (!strcmp(splitInput[0], "pwd"))
 		{
-			pwd();
+			//pwd();
 		}
 		else if (splitInput[1] && !strcmp(splitInput[0], "mkdir"))
 		{
@@ -62,7 +88,7 @@ int main(int argc, char *argv[], char *env[])
 		{
 			rmdir_fs(splitInput[1]);
 		}
-		else if (splitInput1 && !strcmp(splitInput[0], "creat"))
+		else if (splitInput[1] && !strcmp(splitInput[0], "creat"))
 		{
 			creat_fs(splitInput[1]);
 		}
@@ -70,9 +96,9 @@ int main(int argc, char *argv[], char *env[])
 		{
 			fs_link(splitInput[1], splitInput[2]);
 		}
-		else if (splitInput[1] && splitInput[2] && !strcmp(splitInput[0], "unlink"))
+		else if (splitInput[1] && !strcmp(splitInput[0], "unlink"))
 		{
-			fs_unlink(splitInput[1], splitInput[2]);
+			fs_unlink(splitInput[1]);
 		}
 		else if (splitInput[1] && splitInput[2] && !strcmp(splitInput[0], "symlink"))
 		{
@@ -82,9 +108,10 @@ int main(int argc, char *argv[], char *env[])
 		{
 			fs_readlink();
 		}
-		else if (!strcmp(splitInput[0], "open") && splitInput[1])
+		else if (!strcmp(splitInput[0], "open") && splitInput[1]
+&& splitInput[2])
 		{
-			fs_open(splitInput[1]);
+			fs_open(splitInput[1], splitInput[2]);
 		}
 		else if (!strcmp(splitInput[0], "close") && splitInput[1])
 		{
@@ -93,6 +120,10 @@ int main(int argc, char *argv[], char *env[])
 		else if (!strcmp(splitInput[0], "lseek") && splitInput[1] && splitInput[2])
 		{
 			fs_lseek(splitInput[1], splitInput[2]);
+		}
+		else if (!strcmp(splitInput[0], "exit"))
+		{
+			break;
 		}
 		else
 		{
@@ -124,77 +155,4 @@ int mount_root()
 	}
 
 	return 1;
-}
-int ls(char* pathname)
-{
-	int ino;
-	int i_size = 0;
-	
- 	dev = running->cwd->dev;
-
-	MINODE* mip = running->cwd;
-	
-	if(pathname)
-	{
-		if(pathname[0] == "/")	
-		{	
-			dev = root->dev;
-		}
-		else if(pathname[0] == '\n')
-		{
-			printf ("No path entered\n");
-
-			pathname[0] = '.';
-			pathname[1] = '\0';
-		}
-		
-
-		printf("getting ino with entered pathname...\n");
-		ino = getino(dev, pathname);
-		printf("got ino!\n", root->dev);
-		
-
-		mip = iget(dev, ino);
-	}
-	else
-	{
-		printf ("No path entered\n");
-
-		pathname[0] = '.';
-		pathname[1] = '\0';
-
-		printf("getting current ino ...\n");
-		ino = getino(dev, pathname);
-		printf("got ino!\n", root->dev);
-		
-
-		mip = iget(3, ino);
-	}
-
-	ip = &mip->inode;
-	i_size = ip->i_size;
-
-	int i = 0;
-	for(i = 0; i < 12; i++)
-	{
-		
-		if(ip->i_block[i] != 0)
-		{
-			get_block(3, ip->i_block[i], buf);
-			dp = (DIR *)buf;
-			i_size -= dp->rec_len;
-
-
-			print_dir();
-			while(dp != NULL && i_size > 0)
-			{
-				dp = (DIR *)((char *)dp + dp->rec_len);
-				print_dir();
-				i_size -= dp->rec_len;
-			}
-			
-			if(i_size <= 0)
-				break;
-		}
-	}
 }
