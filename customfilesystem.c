@@ -22,11 +22,20 @@ int inodes_begin_block = 0, inodes_per_block = 0;
 char buf[BLKSIZE] = { 0 };
 char buf2[BLKSIZE] = { 0 };
 
+typedef struct open_file
+{
+	int fd;
+	char *name;
+}openFile;
+
 int main(int argc, char *argv[], char *env[])
 {
 	int err = 0, i = 0;
-	char input[256];
+	char input[256], output[256];
 	char* splitInput[256];
+	openFile of;
+
+	of.name = NULL;
 
 	err = mount_root();
 	
@@ -40,7 +49,7 @@ int main(int argc, char *argv[], char *env[])
 	while (1)
 	{
 		printf ("Please type a command: ");
-		scanf ("%s", input);
+		fgets (input, 256, stdin);
 		printf ("\n");
 
 		while(i < 256)
@@ -50,20 +59,18 @@ int main(int argc, char *argv[], char *env[])
 			i++;
 		}
 
-		i = 2;
+		i = 1;
 
 		splitInput[0] = strtok(input, " ");
-
-		splitInput[1] = strtok(NULL, " ");
 
 		while (splitInput[i] = strtok(NULL, " "))
 		{
 			i++;
 		}
 
-		if (!strcmp(splitInput[0], "ls"))
+		if (!strcmp(splitInput[0], "ls") || !strcmp(splitInput[0], "ls\n"))
 		{
-			if (splitInput[1])
+			if (splitInput[1] != NULL)
 			{
 				ls(splitInput[1]);
 			}
@@ -106,22 +113,39 @@ int main(int argc, char *argv[], char *env[])
 		}
 		else if (!strcmp(splitInput[0], "readlink"))
 		{
-			fs_readlink();
+			fs_readlink(splitInput[1], output);
 		}
 		else if (!strcmp(splitInput[0], "open") && splitInput[1]
 && splitInput[2])
 		{
-			fs_open(splitInput[1], splitInput[2]);
+			if (of.name == NULL)
+			{			
+				of.fd = fs_open(splitInput[1], splitInput[2]);
+				of.name = splitInput[1];
+			}
+			else
+			{
+				printf("Please close previous file before opening another.\n");
+			}
 		}
 		else if (!strcmp(splitInput[0], "close") && splitInput[1])
 		{
-			fs_close(splitInput[1]);
+			fs_close(of.fd);
+
+			of.name = NULL;
 		}
 		else if (!strcmp(splitInput[0], "lseek") && splitInput[1] && splitInput[2])
 		{
-			fs_lseek(splitInput[1], splitInput[2]);
+			if (of.name != NULL)
+			{
+				fs_lseek(of.fd, atoi(splitInput[2]));
+			}
+			else
+			{
+				printf("File is not open.");
+			}
 		}
-		else if (!strcmp(splitInput[0], "exit"))
+		else if (!strcmp(splitInput[0], "exit\n"))
 		{
 			break;
 		}
