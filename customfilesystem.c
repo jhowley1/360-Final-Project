@@ -3,8 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "fs_level1.c"
 #include "fs_level2.c"
+
 
 SUPER *sp = NULL;
 GD    *gp = NULL;
@@ -22,6 +22,21 @@ int inodes_begin_block = 0, inodes_per_block = 0;
 char buf[BLKSIZE] = { 0 };
 char buf2[BLKSIZE] = { 0 };
 
+void split_command(char *pathname, char **names)
+{
+	int i = 0;
+	//char** names = malloc(64*sizeof(char *));	
+	const char* delim = " ";
+	
+	names[i] = strtok(pathname, delim);
+	while(names[i] != NULL)
+	{
+		i++;
+		names[i] = strtok(NULL, delim);
+	}
+	names[i - 1] = strtok(names[i - 1], "\n");
+}
+
 typedef struct open_file
 {
 	int fd;
@@ -30,21 +45,21 @@ typedef struct open_file
 
 int main(int argc, char *argv[], char *env[])
 {
-	int err = 0, i = 0;
-	char input[256], output[256];
+	int err = 0, i = 0, k = 0;
+	char input[256], output[256], frankenstring[256], output2[4096];
 	char* splitInput[256];
 	openFile of;
 
 	of.name = NULL;
 
-	err = mount_root();
+	/*err =*/ mount_root();
 	
-	if (!err)
+	/*if (!err)
 	{
 		printf ("Error mounting root");
 
 		return 0;
-	}
+	}*/
 
 	while (1)
 	{
@@ -55,6 +70,7 @@ int main(int argc, char *argv[], char *env[])
 		while(i < 256)
 		{
 			splitInput[i] = NULL;
+			frankenstring[i] = '\0';
 
 			i++;
 		}
@@ -76,7 +92,7 @@ int main(int argc, char *argv[], char *env[])
 			}
 			else
 			{
-				ls("\n");
+				ls(".");
 			}
 		}
 		else if (splitInput[1] && !strcmp(splitInput[0], "cd"))
@@ -119,9 +135,11 @@ int main(int argc, char *argv[], char *env[])
 && splitInput[2])
 		{
 			if (of.name == NULL)
-			{			
-				of.fd = fs_open(splitInput[1], splitInput[2]);
+			{	
+				printf("");
+				of.fd = fs_open(splitInput[1], atoi(splitInput[2]));
 				of.name = splitInput[1];
+				printf("file descriptor: %d\n", of.fd);
 			}
 			else
 			{
@@ -134,6 +152,44 @@ int main(int argc, char *argv[], char *env[])
 
 			of.name = NULL;
 		}
+		else if (!strcmp(splitInput[0], "write") && splitInput[1]
+&& splitInput[2])
+		{
+			if (*splitInput[2] == '"')
+			{
+				for (int j = 2; splitInput[j] != NULL; j++)
+				{
+					for (int m = 0; splitInput[j][m] != '\0'; m++)
+					{
+						if (splitInput[j][m] == '"'){}
+						else
+						{
+							frankenstring[k] = splitInput[j][m];
+							k++;
+						}
+					}
+
+					frankenstring[k] = ' ';
+
+					k++;
+				}
+
+				printf("text: %s\n", frankenstring);
+
+				write_file(of.fd, frankenstring, strlen(frankenstring));
+			}
+			else
+			{
+				printf("text: %s\n", splitInput[2]);
+
+				write_file(of.fd, splitInput[2], strlen(splitInput[2]));
+			}
+
+		}
+		else if (!strcmp(splitInput[0], "read"))
+		{
+			read_file(of.fd, output2, 4096);
+		}
 		else if (!strcmp(splitInput[0], "lseek") && splitInput[1] && splitInput[2])
 		{
 			if (of.name != NULL)
@@ -144,6 +200,14 @@ int main(int argc, char *argv[], char *env[])
 			{
 				printf("File is not open.");
 			}
+		}
+		else if (!strcmp(splitInput[0], "chmod") && splitInput[1] && splitInput[2])
+		{
+			//fs_chmod(atoi(splitInput[1], splitInput[2])
+		}
+		else if (!strcmp(splitInput[0], "touch") && splitInput[1])
+		{
+			//fs_touch(splitInput[1]);
 		}
 		else if (!strcmp(splitInput[0], "exit\n"))
 		{
@@ -156,27 +220,36 @@ int main(int argc, char *argv[], char *env[])
 	}
 }
 
-int mount_root()
-{
-	dev = open("diskimage", O_RDONLY);
+void mount_root()
+{		
+	dev = open("diskimage", O_RDWR);
 	root = iget(dev, 2);
 
-	printf("root\n");
-	printf("dev: %d\n", root->dev);
-	printf("ino: %d\n", root->ino);
-	printf("refCount: %d\n", root->refCount);
-	printf("dirty: %d\n", root->dirty);
-	printf("mounted: %d\n", root->mounted);
-
+	//set processes current working directory to root minode
 	proc[0].cwd = iget(root->dev, 2);
 	proc[1].cwd = iget(root->dev, 2);	
 
+	//set running process to first process
 	running = &proc[0];
 
-	if (!dev && !root && !running)
+}
+
+void init()
+{
+	
+	int i = 0;
+
+
+	proc[0].uid = 0;
+	proc[1].uid = 1;
+	proc[0].cwd = 0;
+	proc[1].cwd = 0;
+
+
+	for(i = 0; i < NMINODE; i++)
 	{
-		return 0;
+		minode[i].refCount = 0;
 	}
 
-	return 1;
 }
+
